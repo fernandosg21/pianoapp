@@ -1,0 +1,32 @@
+[project]
+name = "pianoapp-backend"
+version = "1.0.0"
+description = "Transcrição de áudio para notas de piano — pipeline adaptativo"
+requires-python = ">=3.11"
+
+# torch NÃO entra aqui: vem da imagem base pytorch/pytorch, já compilado com CUDA.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "pydantic>=2.7",
+    "numpy>=1.26",
+    "librosa>=0.10.2",
+    "soundfile>=0.12",
+    "pretty_midi>=0.2.10",
+    "demucs>=4.1.0",
+    "piano_transcription_inference>=0.0.6",
+    # basic-pitch é instalado com --no-deps no Dockerfile: em Linux + Python >=3.11
+    # o marker dele arrasta TensorFlow (~600 MB), inútil aqui porque usamos ONNX.
+    "onnxruntime>=1.17",
+    "scipy>=1.11",
+    "scikit-learn>=1.4",
+    "resampy>=0.4.2",
+    "mir_eval>=0.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
