@@ -56,6 +56,61 @@ Em CPU, multiplique por algo entre 5× e 10×.
 
 ---
 
+## Usar pelo iPad, na mesma rede
+
+O container já escuta em todas as interfaces, então basta acessar pelo IP da
+máquina — não há nada a configurar no app.
+
+**1. Descubra o IP do computador:**
+
+```bash
+hostname -I | awk '{print $1}'      # Linux
+ipconfig getifaddr en0              # macOS
+ipconfig                            # Windows (procure "Endereço IPv4")
+```
+
+**2. No iPad, abra** `http://SEU-IP:8080` — por exemplo `http://192.168.0.42:8080`.
+
+Se o computador tiver Avahi ou Bonjour, `http://nome-do-pc.local:8080` também
+funciona e não muda quando o roteador troca o IP.
+
+**3. Se não abrir**, quase sempre é o firewall do host:
+
+```bash
+sudo ufw allow 8080/tcp             # Ubuntu/Debian
+sudo firewall-cmd --add-port=8080/tcp --permanent && sudo firewall-cmd --reload
+```
+
+### Deixe como um app
+
+No Safari do iPad: **Compartilhar › Adicionar à Tela de Início**. Ele abre em tela
+cheia, sem a moldura do navegador, com ícone próprio — e é assim que vale a pena
+usar na estante da partitura.
+
+### Durante o estudo
+
+- **Laço A-B.** Toque em `A` no início do trecho e `B` no fim: ele passa a repetir
+  sozinho. O trecho aparece marcado na linha do tempo e dentro do próprio rolo.
+  `↻` liga e desliga sem perder as marcas, `✕` limpa.
+- **Andamento.** 0,5× a 1×. A altura das notas não muda, só a velocidade.
+- **Tema.** O ☾/☀ no topo troca entre a sala escura e o papel claro. Escuro não
+  ofusca à noite; claro se enxerga sob a luz da janela.
+- **Teclado ajustado.** Por padrão o app mostra só as oitavas que a música usa, para
+  as teclas ficarem largas o bastante numa tela de tablet. "Ver as 88 teclas" mostra
+  o piano inteiro.
+
+### Dois detalhes do iOS que valem saber
+
+**A tela apaga sozinha.** O navegador só permite segurar a tela acesa em HTTPS, e o
+acesso pela rede local é HTTP — então a API padrão não fica disponível. O app avisa
+quando isso acontece. A saída confiável é desativar o bloqueio automático enquanto
+estuda: **Ajustes › Tela e Brilho › Bloqueio Automático › Nunca**.
+
+**O interruptor lateral corta o som.** Se o iPad estiver no silencioso, o áudio de
+página web não toca — é comportamento do iOS, não do app.
+
+---
+
 ## Como funciona
 
 Nenhum modelo de transcrição é o melhor para todo tipo de áudio, então o pipeline
@@ -103,10 +158,11 @@ precisar reenviar o arquivo.
    - **Lista de notas** — tabela com tempo, duração e mão; clique numa linha para
      saltar até ela; botão para copiar tudo.
    - **Partitura** — pauta dupla.
-4. **Baixar MIDI** exporta o resultado para abrir em qualquer DAW ou editor.
+4. **MIDI** exporta o resultado para abrir em qualquer DAW ou editor.
 
-O alternador **C D E / Dó Ré Mi** troca a notação em toda a interface, e o controle de
-velocidade (0,5× / 0,75× / 1×) serve para estudar trechos difíceis.
+O alternador **C D E / Dó Ré Mi** troca a notação em toda a interface. O laço A-B e o
+andamento reduzido são o que torna o app útil para estudar de fato — veja a seção do
+iPad acima.
 
 Formatos aceitos: MP3, WAV, FLAC, OGG, M4A, AAC, AIFF, Opus.
 

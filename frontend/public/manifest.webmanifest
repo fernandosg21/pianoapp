@@ -1,0 +1,14 @@
+{
+  "name": "pianoapp",
+  "short_name": "pianoapp",
+  "description": "Transcrição de áudio para notas de piano",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

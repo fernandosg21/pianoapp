@@ -21,6 +21,7 @@ MIDDLE_C = 60           # fronteira nominal entre as mãos
 SUBDIVISION = 4         # semicolcheias por batida
 DEFAULT_TEMPO = 120.0
 _SMOOTH_WINDOW = 5      # notas vizinhas consideradas na suavização de mão
+_MAX_REACH = 7          # semitons: o quanto uma nota pode estar do registro da outra mão
 
 
 def estimate_tempo(y: np.ndarray, sr: int) -> float:
@@ -42,8 +43,11 @@ def quantize(value_s: float, tempo: float) -> float:
 def split_hands(notes: list[RawNote]) -> list[Hand]:
     """Divide pelo dó central e depois suaviza.
 
-    A divisão crua pica uma linha que cruza a fronteira; a suavização olha as
-    vizinhas para manter a frase inteira na mesma mão.
+    A divisão crua pica uma linha que cruza a fronteira, então uma nota pode migrar
+    para a mão das vizinhas. Mas só migra se estiver de fato no registro daquela
+    mão: contar vizinhas não basta — num trecho de melodia aguda sobre baixo
+    caminhante, a maioria é sempre da direita, e um sol grave acabava arrastado
+    para lá junto, a duas oitavas de onde a mão direita realmente está.
     """
     raw = [Hand.LEFT if n.midi < MIDDLE_C else Hand.RIGHT for n in notes]
     if len(raw) <= _SMOOTH_WINDOW:
@@ -53,12 +57,19 @@ def split_hands(notes: list[RawNote]) -> list[Hand]:
     half = _SMOOTH_WINDOW // 2
     for i, hand in enumerate(raw):
         lo, hi = max(0, i - half), min(len(raw), i + half + 1)
-        window = raw[lo:hi]
-        majority = Hand.LEFT if window.count(Hand.LEFT) > window.count(Hand.RIGHT) else Hand.RIGHT
-        # Só cede à maioria quando a nota está perto da fronteira; um baixo grave
-        # nunca deve migrar para a direita só porque a frase ao redor é aguda.
-        distance = abs(notes[i].midi - MIDDLE_C)
-        smoothed.append(majority if distance <= 7 else hand)
+        window = range(lo, hi)
+        lefts = sum(1 for j in window if raw[j] is Hand.LEFT)
+        rights = (hi - lo) - lefts
+        majority = Hand.LEFT if lefts > rights else Hand.RIGHT
+
+        if majority is hand:
+            smoothed.append(hand)
+            continue
+
+        neighbours = [notes[j].midi for j in window if raw[j] is majority and j != i]
+        centre = sum(neighbours) / len(neighbours) if neighbours else notes[i].midi
+        within_reach = abs(notes[i].midi - centre) <= _MAX_REACH
+        smoothed.append(majority if within_reach else hand)
     return smoothed
 
 

@@ -4,7 +4,7 @@ import { api } from '../lib/api'
 import type { Health } from '../types'
 
 /**
- * Faixa de status.
+ * Estado da máquina, em uma linha.
  *
  * Quando a transcrição estiver lenta, isto responde na hora a pergunta certa:
  * está usando a GPU ou caiu para CPU?
@@ -20,26 +20,28 @@ export function HealthBar() {
   }, [])
 
   if (!health) {
-    return <span className="text-xs text-slate-500">backend indisponível</span>
+    return (
+      <span className="flex items-center gap-2 text-xs text-ink-faint">
+        <span className="h-1.5 w-1.5 rounded-full bg-felt" />
+        backend fora do ar
+      </span>
+    )
   }
 
   return (
-    <span className="flex items-center gap-2 text-xs">
-      <span className={`h-2 w-2 rounded-full ${health.gpu ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+    <span className="flex items-center gap-2 text-xs text-ink-faint">
+      <span className={`h-1.5 w-1.5 rounded-full ${health.gpu ? 'bg-brass' : 'bg-rule-strong'}`} />
       {health.gpu ? (
-        <span className="text-slate-400">
-          {health.gpu_name}
+        <>
+          <span className="text-ink-soft">{health.gpu_name}</span>
           {health.vram_free_mb != null && health.vram_total_mb != null && (
-            <span className="text-slate-500">
-              {' '}· {Math.round(health.vram_free_mb / 1024)} de{' '}
-              {Math.round(health.vram_total_mb / 1024)} GB livres
+            <span className="tabular">
+              {Math.round(health.vram_free_mb / 1024)}/{Math.round(health.vram_total_mb / 1024)} GB
             </span>
           )}
-        </span>
+        </>
       ) : (
-        <span className="text-slate-400">
-          rodando em CPU — mais lento; confira o passthrough de GPU
-        </span>
+        <span>em CPU</span>
       )}
     </span>
   )

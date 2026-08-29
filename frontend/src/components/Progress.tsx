@@ -3,7 +3,7 @@ import type { JobStatus, Stage } from '../types'
 const STAGE_LABELS: Record<Stage, string> = {
   queued: 'Na fila',
   loading: 'Carregando o áudio',
-  triage: 'Analisando o tipo de gravação',
+  triage: 'Ouvindo que tipo de gravação é',
   separation: 'Separando os instrumentos',
   transcription: 'Transcrevendo as notas',
   score: 'Montando a partitura',
@@ -21,46 +21,50 @@ export function Progress({ status }: Props) {
   const currentIndex = ORDER.indexOf(status.stage)
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 rounded-lg border border-edge bg-panel p-6">
+    <div className="surface mx-auto max-w-xl space-y-6 p-6">
       <div>
-        <h2 className="text-lg font-semibold text-white">{status.filename}</h2>
-        <p className="text-sm text-slate-400">
+        <h2 className="font-display text-xl">{status.filename}</h2>
+        <p className="mt-1 text-sm text-ink-soft">
           {STAGE_LABELS[status.stage]}
           {status.queue_position ? ` — ${status.queue_position}º na fila` : ''}
         </p>
       </div>
 
-      <div className="h-2 overflow-hidden rounded-full bg-black/40">
+      <div className="h-[3px] overflow-hidden rounded-full bg-rule">
         <div
-          className="h-full bg-sky-500 transition-all duration-500"
+          className="h-full rounded-full bg-felt transition-all duration-500"
           style={{ width: `${Math.round(status.progress * 100)}%` }}
         />
       </div>
 
-      <ol className="space-y-1.5 text-sm">
+      <ol className="space-y-2 text-sm">
         {ORDER.map((stage, index) => {
           // Separação só existe na rota de mixagem densa; nas outras é pulada.
           const skipped = stage === 'separation' && status.route === 'solo'
           const done = currentIndex > index
+          const current = currentIndex === index
           return (
             <li
               key={stage}
-              className={
-                done ? 'text-emerald-400'
-                : currentIndex === index ? 'text-white'
-                : 'text-slate-500'
-              }
+              className={`flex items-center gap-3 ${
+                done ? 'text-ink-soft' : current ? 'text-ink' : 'text-ink-faint'
+              }`}
             >
-              {done ? '✓' : currentIndex === index ? '›' : '·'} {STAGE_LABELS[stage]}
-              {skipped && ' (não necessária)'}
+              <span
+                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                  done ? 'bg-brass' : current ? 'animate-pulse bg-felt' : 'bg-rule-strong'
+                }`}
+              />
+              {STAGE_LABELS[stage]}
+              {skipped && <span className="text-ink-faint">— não necessária</span>}
             </li>
           )
         })}
       </ol>
 
       {status.device && (
-        <p className="text-xs text-slate-500">
-          Processando em {status.device === 'cpu' ? 'CPU' : status.device.toUpperCase()}
+        <p className="text-xs text-ink-faint">
+          processando em {status.device === 'cpu' ? 'CPU' : status.device.toUpperCase()}
         </p>
       )}
     </div>

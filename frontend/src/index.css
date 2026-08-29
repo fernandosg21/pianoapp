@@ -1,10 +1,229 @@
+/* Fontes auto-hospedadas: um app self-hosted não pode depender de CDN. */
+/* Só os subconjuntos latinos: a interface é em português, e cirílico/grego/
+   vietnamita só engordariam o bundle sem nunca serem baixados. */
+@import '@fontsource-variable/fraunces/opsz.css';
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/ibm-plex-sans/latin-ext-400.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+/*
+  O mundo de cor vem de uma sala de piano, não de um painel de controle.
+  Os papéis são nomeados pelo que são no instrumento — palco, caixa, tinta,
+  feltro, latão — e cada tema preenche esses papéis com o seu material.
 
-body {
-  @apply bg-ink text-slate-200 antialiased;
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  O feltro é a única cor carmim da interface. Ele marca o agora: a faixa de
+  feltro que atravessa as teclas de um piano vertical, onde a nota que cai
+  encontra a tecla e soa.
+*/
+
+/* Sala de piano, à noite. */
+:root,
+[data-theme='night'] {
+  color-scheme: dark;
+
+  --stage: #17140f;        /* ébano: o fundo */
+  --case: #201a14;         /* rosewood: a caixa, painéis */
+  --case-lifted: #29211a;  /* elevação sussurrada */
+  --rule: #34291f;         /* linhas, como as da pauta */
+  --rule-strong: #4a3b2c;
+
+  --ink: #ede6d8;          /* marfim */
+  --ink-soft: #a89c88;
+  --ink-faint: #6d6354;
+
+  --felt: #a33b32;         /* o agora */
+  --felt-glow: #c9564a;
+  --brass: #b08d4f;        /* acento único */
+  --brass-bright: #d2a24e;
+
+  --natural: #e8e0d0;      /* tecla branca */
+  --natural-lit: #f3d9a0;
+  --sharp: #100d09;        /* tecla preta */
+  --sharp-lit: #b08d4f;
+
+  --hand-right: #d2a24e;   /* latão polido */
+  --hand-left: #7e9478;    /* a pátina do latão */
+}
+
+/* Partitura em papel. */
+[data-theme='paper'] {
+  color-scheme: light;
+
+  --stage: #f2ead9;
+  --case: #ebe1cc;
+  --case-lifted: #f7f1e3;
+  --rule: #d8cbb0;
+  --rule-strong: #bdaa8a;
+
+  --ink: #1e1913;
+  --ink-soft: #5f5647;
+  --ink-faint: #8a7f6c;
+
+  --felt: #8c2f2a;
+  --felt-glow: #a8443c;
+  --brass: #8f6a1e;
+  --brass-bright: #7a5813;
+
+  --natural: #fbf7ee;
+  --natural-lit: #f0d9a4;
+  --sharp: #241d15;
+  --sharp-lit: #8f6a1e;
+
+  --hand-right: #8f6a1e;
+  --hand-left: #4e6a52;
+}
+
+/*
+  Tintas translúcidas. Definidas uma vez só, fora dos blocos de tema: o color-mix
+  resolve no momento do uso, então elas seguem sozinhas o tema ativo.
+
+  Existem como token porque o modificador de opacidade do Tailwind (bg-brass/15)
+  é descartado em silêncio quando a cor vem de uma variável CSS — o fundo some sem
+  aviso, e só se percebe olhando o CSS gerado.
+*/
+:root {
+  --tint-brass: color-mix(in srgb, var(--brass) 14%, transparent);
+  --tint-brass-strong: color-mix(in srgb, var(--brass) 26%, transparent);
+  --tint-felt: color-mix(in srgb, var(--felt) 14%, transparent);
+  --tint-ink: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+@layer base {
+  body {
+    background: var(--stage);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Fraunces com eixo óptico alto: desenho gravado, ar de partitura impressa. */
+  h1, h2, h3, .font-display {
+    font-family: 'Fraunces Variable', Georgia, serif;
+    /* Eixo óptico alto: contraste de traço mais marcado, ar de partitura gravada. */
+    font-variation-settings: 'opsz' 40;
+    letter-spacing: -0.01em;
+  }
+
+  /* Números são dados: monoespaçados e tabulares, para o relógio não tremer. */
+  .tabular, time, .font-mono {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Toque: sem realce azul do iOS e sem atraso de 300 ms no duplo toque. */
+  button, a, input, label, select {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Evita o quique elástico da página ao arrastar sobre o piano roll. */
+  html, body {
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  ::selection {
+    background: var(--felt);
+    color: var(--natural);
+  }
+}
+
+@layer components {
+  /* Profundidade é só borda — nenhuma sombra em lugar nenhum. Ferramenta densa,
+     linhas discretas: a estrutura se percebe sem que a borda salte aos olhos. */
+  .surface {
+    background: var(--case);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+  }
+
+  .surface-lifted {
+    background: var(--case-lifted);
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+  }
+
+  /* Alvos de toque: 44 px é o mínimo para acertar com o dedo sem olhar. */
+  .control {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0 0.875rem;
+    border-radius: 4px;
+    border: 1px solid var(--rule);
+    color: var(--ink-soft);
+    background: transparent;
+    font-size: 0.875rem;
+    transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;
+  }
+
+  .control:hover {
+    color: var(--ink);
+    border-color: var(--rule-strong);
+  }
+
+  .control:active {
+    background: var(--case-lifted);
+  }
+
+  .control[aria-pressed='true'],
+  .control[data-active='true'] {
+    color: var(--brass-bright);
+    border-color: var(--brass);
+    background: color-mix(in srgb, var(--brass) 12%, transparent);
+  }
+
+  .control:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .control:focus-visible,
+  .segment:focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 2px;
+  }
+
+  /* Peça de um controle segmentado: o grupo carrega a borda, não cada botão. */
+  .segment {
+    min-height: 44px;
+    min-width: 46px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    color: var(--ink-faint);
+    background: transparent;
+    transition: color 150ms ease, background-color 150ms ease;
+  }
+
+  .segment:hover:not(:disabled) {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+  }
+
+  .segment[aria-pressed='true'],
+  .segment[data-active='true'] {
+    color: var(--brass-bright);
+    background: color-mix(in srgb, var(--brass) 14%, transparent);
+  }
+
+  .segment:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
 }

@@ -14,13 +14,13 @@ const MODES: Array<{ value: Mode; title: string; detail: string; estimate: strin
     detail:
       'Escolhe sozinho o melhor caminho: instrumento solo vai ao modelo dedicado a piano; ' +
       'mixagem densa é separada em instrumentos antes de transcrever.',
-    estimate: '~1 a 5 min',
+    estimate: '1 a 5 min',
   },
   {
     value: 'fast',
     title: 'Rápido',
-    detail: 'Um único passe multi-instrumento, sem separação de fontes. Bom para uma prévia.',
-    estimate: '~10 a 30 s',
+    detail: 'Um passe multi-instrumento, sem separação de fontes. Serve para uma prévia.',
+    estimate: '10 a 30 s',
   },
 ]
 
@@ -45,32 +45,35 @@ export function Upload({ onStarted }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div className="space-y-2">
-        <h2 className="text-xl font-semibold text-white">Escolha a qualidade</h2>
+    <div className="mx-auto max-w-2xl space-y-8">
+      <div className="space-y-4">
+        <h2 className="font-display text-2xl">Uma gravação vira notas de piano</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {MODES.map((option) => (
             <button
               key={option.value}
               onClick={() => setMode(option.value)}
-              className={`rounded-lg border p-4 text-left transition ${
+              className={`rounded-md border p-4 text-left transition-colors ${
                 mode === option.value
-                  ? 'border-sky-500 bg-sky-950/40'
-                  : 'border-edge bg-panel hover:border-slate-500'
+                  ? 'border-brass bg-tint-brass'
+                  : 'border-rule bg-case hover:border-rule-strong'
               }`}
             >
-              <div className="flex items-baseline justify-between">
-                <span className="font-medium text-white">{option.title}</span>
-                <span className="text-xs text-slate-400">{option.estimate}</span>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-display text-[1.05rem]">{option.title}</span>
+                <span className="tabular text-xs text-ink-faint">{option.estimate}</span>
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">{option.detail}</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-soft">{option.detail}</p>
             </button>
           ))}
         </div>
       </div>
 
       <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragging(true)
+        }}
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
           e.preventDefault()
@@ -79,28 +82,28 @@ export function Upload({ onStarted }: Props) {
           if (file) void send(file)
         }}
         onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer rounded-xl border-2 border-dashed p-12 text-center transition ${
-          dragging ? 'border-sky-400 bg-sky-950/30' : 'border-edge bg-panel hover:border-slate-500'
+        className={`cursor-pointer rounded-md border border-dashed p-12 text-center transition-colors ${
+          dragging ? 'border-brass bg-tint-brass' : 'border-rule-strong bg-case hover:border-brass'
         }`}
       >
         <input
           ref={inputRef}
           type="file"
-          accept="audio/*,.mp3,.wav,.flac,.ogg,.m4a"
+          accept="audio/*"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0]
             if (file) void send(file)
           }}
         />
-        <p className="text-lg text-white">
-          {sending ? 'Enviando…' : 'Arraste um áudio aqui ou clique para escolher'}
+        <p className="font-display text-lg">
+          {sending ? 'Enviando…' : 'Arraste um áudio ou toque para escolher'}
         </p>
-        <p className="mt-2 text-sm text-slate-400">MP3, WAV, FLAC, OGG, M4A</p>
+        <p className="mt-2 text-sm text-ink-faint">MP3, WAV, FLAC, OGG, M4A</p>
       </div>
 
       {error && (
-        <p className="rounded border border-red-700/40 bg-red-900/20 px-4 py-3 text-sm text-red-200">
+        <p className="rounded border border-felt bg-tint-felt px-4 py-3 text-sm text-ink-soft">
           {error}
         </p>
       )}

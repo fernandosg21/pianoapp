@@ -11,7 +11,7 @@ interface Props {
 const STATE_LABEL: Record<JobSummary['state'], string> = {
   queued: 'na fila',
   running: 'processando',
-  done: 'pronta',
+  done: '',
   error: 'falhou',
 }
 
@@ -34,39 +34,45 @@ export function Library({ onOpen }: Props) {
     refresh()
   }
 
-  if (loading) return <p className="text-slate-400">Carregando…</p>
+  if (loading) return <p className="text-ink-faint">Carregando…</p>
   if (jobs.length === 0) {
-    return <p className="text-slate-400">Nenhuma transcrição ainda.</p>
+    return (
+      <p className="mx-auto max-w-3xl text-ink-faint">
+        Nada estudado ainda. A primeira transcrição aparece aqui.
+      </p>
+    )
   }
 
   return (
-    <ul className="mx-auto max-w-3xl divide-y divide-edge overflow-hidden rounded-lg border border-edge bg-panel">
+    <ul className="surface mx-auto max-w-3xl divide-y divide-rule overflow-hidden">
       {jobs.map((job) => (
-        <li key={job.id} className="flex items-center gap-4 px-4 py-3">
+        <li key={job.id} className="flex items-center gap-4 px-4">
           <button
-            className="flex-1 text-left"
+            className="flex-1 py-3 text-left disabled:opacity-60"
             onClick={() => job.state === 'done' && onOpen(job.id)}
             disabled={job.state !== 'done'}
           >
-            <span className="block font-medium text-white">{job.filename}</span>
-            <span className="text-xs text-slate-400">
-              {new Date(job.created_at * 1000).toLocaleString('pt-BR')}
-              {' · '}{job.mode === 'precise' ? 'máxima precisão' : 'rápido'}
-              {job.route && ` · ${job.route === 'solo' ? 'solo' : 'mix denso'}`}
-              {job.duration != null && ` · ${formatTime(job.duration)}`}
+            <span className="font-display block text-[1.05rem]">{job.filename}</span>
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-ink-faint">
+              <span className="tabular">
+                {new Date(job.created_at * 1000).toLocaleString('pt-BR', {
+                  day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+                })}
+              </span>
+              <span>{job.mode === 'precise' ? 'máxima precisão' : 'rápido'}</span>
+              {job.route && <span>{job.route === 'solo' ? 'solo' : 'mix denso'}</span>}
+              {job.duration != null && <span className="tabular">{formatTime(job.duration)}</span>}
+              {STATE_LABEL[job.state] && (
+                <span className={job.state === 'error' ? 'text-felt' : 'text-brass'}>
+                  {STATE_LABEL[job.state]}
+                </span>
+              )}
             </span>
           </button>
-          <span
-            className={`text-xs ${
-              job.state === 'done' ? 'text-emerald-400'
-              : job.state === 'error' ? 'text-red-400' : 'text-slate-400'
-            }`}
-          >
-            {STATE_LABEL[job.state]}
-          </span>
           <button
             onClick={() => void remove(job.id)}
-            className="rounded border border-edge px-2 py-1 text-xs text-slate-400 hover:bg-white/5"
+            className="text-xs text-ink-faint hover:text-felt"
+            aria-label={`Excluir ${job.filename}`}
           >
             excluir
           </button>

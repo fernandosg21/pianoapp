@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Accidental, Formatter, Renderer, Stave, StaveConnector, StaveNote, Voice } from 'vexflow'
 
+import type { Theme } from '../hooks/useTheme'
 import { buildMeasures, type Measure } from '../lib/staff'
 import type { Transcription } from '../types'
 
@@ -11,6 +12,7 @@ const PAGE_SIZE = 16
 
 interface Props {
   transcription: Transcription
+  theme: Theme
 }
 
 /**
@@ -19,7 +21,7 @@ interface Props {
  * É a saída mais frágil das três: empilha uma grade rítmica estimada sobre uma
  * transcrição que já é aproximada. Por isso o aviso fica visível no topo.
  */
-export function Score({ transcription }: Props) {
+export function Score({ transcription, theme }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [visible, setVisible] = useState(PAGE_SIZE)
   const [error, setError] = useState<string | null>(null)
@@ -36,13 +38,18 @@ export function Score({ transcription }: Props) {
     container.innerHTML = ''
     if (shown.length === 0) return
 
+    // Mesmo motivo do piano roll: neste ponto o data-theme ainda é o anterior,
+    // porque efeitos de filho rodam antes dos do pai. Desenhamos no quadro seguinte.
+    const frame = requestAnimationFrame(() => {
     try {
       const lines = Math.ceil(shown.length / MEASURES_PER_LINE)
       const renderer = new Renderer(container, Renderer.Backends.SVG)
       renderer.resize(MEASURES_PER_LINE * MEASURE_WIDTH + 40, lines * LINE_HEIGHT + 40)
       const context = renderer.getContext()
-      context.setFillStyle('#e6edf3')
-      context.setStrokeStyle('#e6edf3')
+      // A pauta é tinta sobre o papel do tema, não uma cor fixa.
+      const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim()
+      context.setFillStyle(ink)
+      context.setStrokeStyle(ink)
 
       shown.forEach((measure, i) => {
         const column = i % MEASURES_PER_LINE
@@ -54,27 +61,29 @@ export function Score({ transcription }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
-  }, [shown, transcription.time_signature])
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [shown, transcription.time_signature, theme])
 
   if (measures.length === 0) {
-    return <p className="text-slate-400">Nada para exibir na partitura.</p>
+    return <p className="text-ink-faint">Nada para exibir na partitura.</p>
   }
 
   return (
     <div className="space-y-3">
-      <p className="rounded border border-amber-700/40 bg-amber-900/20 px-3 py-2 text-sm text-amber-200">
+      <p className="rounded border border-brass bg-tint-brass px-3 py-2 text-sm text-ink-soft">
         Partitura <strong>aproximada</strong>: o ritmo é encaixado numa grade estimada por cima de
         uma transcrição automática. Serve para leitura, não como edição final.
       </p>
       {error && (
-        <p className="rounded border border-red-700/40 bg-red-900/20 px-3 py-2 text-sm text-red-200">
+        <p className="rounded border border-felt bg-tint-felt px-3 py-2 text-sm text-ink-soft">
           Não foi possível desenhar a pauta: {error}
         </p>
       )}
-      <div ref={containerRef} className="overflow-x-auto rounded-lg bg-panel p-2" />
+      <div ref={containerRef} className="surface overflow-x-auto p-2" />
       {visible < measures.length && (
         <button
-          className="rounded border border-edge px-3 py-1.5 text-sm hover:bg-panel"
+          className="control"
           onClick={() => setVisible((v) => v + PAGE_SIZE)}
         >
           Mostrar mais compassos ({measures.length - visible} restantes)
