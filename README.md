@@ -1,0 +1,182 @@
+# pianoapp
+
+Transforma uma gravação de áudio em notas de piano: piano roll sincronizado ao som,
+lista de notas e partitura. Roda inteiro na sua máquina, com GPU.
+
+![modo](https://img.shields.io/badge/GPU-CUDA%2012.6-informational) ![licença](https://img.shields.io/badge/uso-self--hosted-lightgrey)
+
+---
+
+## Subir
+
+```bash
+git clone https://github.com/fernandosg21/pianoapp.git
+cd pianoapp
+docker compose up -d --build
+```
+
+Abra **http://localhost:8080**.
+
+O primeiro build baixa a imagem base do PyTorch e os pesos dos modelos (~5,5 GB no
+total) — leva alguns minutos. Depois disso o container funciona offline: nada é
+baixado em tempo de execução.
+
+Para parar: `docker compose down`. As transcrições ficam guardadas num volume e
+reaparecem no próximo `up`.
+
+---
+
+## GPU
+
+O `docker-compose.yml` já pede a GPU. Isso exige o **NVIDIA Container Toolkit** no
+host. Para conferir se o passthrough funciona:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu22.04 nvidia-smi
+```
+
+Se a sua placa aparecer nessa lista, está tudo certo. **Se não aparecer, o app sobe
+do mesmo jeito e roda em CPU** — mais lento, porém funcional. A faixa no topo da
+interface diz sempre qual dos dois está em uso.
+
+Instalação do toolkit (Ubuntu/Debian):
+<https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html>
+
+### Tempos esperados
+
+Para ~3 minutos de áudio numa GTX 1660 (6 GB):
+
+| Modo | O que faz | Tempo |
+|---|---|---|
+| Rápido | um passe multi-instrumento, sem separação | ~10–30 s |
+| Máxima precisão, instrumento solo | modelo dedicado a piano | ~30–60 s |
+| Máxima precisão, mixagem densa | separação + transcrição por instrumento | ~1–2 min |
+
+Em CPU, multiplique por algo entre 5× e 10×.
+
+---
+
+## Como funciona
+
+Nenhum modelo de transcrição é o melhor para todo tipo de áudio, então o pipeline
+escolhe o caminho conforme a gravação:
+
+1. **Triagem** — mede quanto da energia do áudio é percussiva (separação
+   harmônico/percussivo). Bateria e transientes densos empurram para "mixagem densa";
+   piano e vozes sustentadas, para "instrumento solo".
+
+2. **Instrumento solo** → *High-resolution Piano Transcription* (ByteDance), treinado
+   especificamente em piano. É a melhor qualidade do projeto e a única rota que
+   extrai **pedal de sustain** e dinâmica.
+
+3. **Mixagem densa** → **Demucs** separa a faixa em bateria, baixo, vocais e demais
+   instrumentos; a bateria é descartada e cada stem harmônico é transcrito
+   separadamente com o **basic-pitch** (multi-instrumento). Transcrever a mixagem
+   inteira de uma vez é o que faz qualquer modelo produzir lixo.
+
+4. **Redução pianística** — funde as notas repetidas, descarta as curtas demais,
+   limita a polifonia simultânea e separa as mãos, para o resultado ser tocável em
+   duas mãos e não uma nuvem de notas.
+
+A triagem é uma heurística e **vai errar em casos de borda**. A interface mostra qual
+rota foi usada e oferece "reprocessar como solo/mixagem densa" com um clique, sem
+precisar reenviar o arquivo.
+
+### O que esperar da qualidade
+
+- **Piano solo limpo:** excelente.
+- **Faixa de banda completa:** utilizável, não fiel. Reduzir uma música pop a piano é
+  aproximação por natureza, mesmo com separação de fontes.
+- **Partitura:** é a saída mais frágil das três, porque encaixa uma grade rítmica
+  estimada em cima de um resultado que já é aproximado. Serve para leitura, não como
+  edição final — a interface avisa isso.
+
+---
+
+## Uso
+
+1. Escolha o modo (**rápido** ou **máxima precisão**) e arraste um áudio.
+2. Acompanhe o progresso por estágio.
+3. No resultado, três visualizações compartilham o mesmo relógio do áudio:
+   - **Piano roll** — blocos caindo sobre um teclado de 88 teclas, mãos em cores
+     distintas.
+   - **Lista de notas** — tabela com tempo, duração e mão; clique numa linha para
+     saltar até ela; botão para copiar tudo.
+   - **Partitura** — pauta dupla.
+4. **Baixar MIDI** exporta o resultado para abrir em qualquer DAW ou editor.
+
+O alternador **C D E / Dó Ré Mi** troca a notação em toda a interface, e o controle de
+velocidade (0,5× / 0,75× / 1×) serve para estudar trechos difíceis.
+
+Formatos aceitos: MP3, WAV, FLAC, OGG, M4A, AAC, AIFF, Opus.
+
+---
+
+## Ajustes
+
+Copie `.env.example` para `.env`. Os que mais importam:
+
+| Variável | Default | Para quê |
+|---|---|---|
+| `PIANOAPP_DEMUCS_SEGMENT` | `7.0` | Segundos por vez no Demucs — **é o que controla o pico de VRAM**. Reduza se vir `CUDA out of memory`; aumente para 15 se tiver 12 GB ou mais. |
+| `PIANOAPP_DEVICE` | `auto` | `cpu` força CPU mesmo com GPU presente. |
+| `PIANOAPP_MAX_WORKERS` | `1` | Jobs simultâneos. Mantenha 1 com GPU. |
+| `PIANOAPP_MAX_POLYPHONY` | `8` | Notas simultâneas na redução. Menor = mais tocável, maior = mais fiel. |
+| `PIANOAPP_PERCUSSIVE_THRESHOLD` | `0.42` | Limiar da triagem. |
+
+Um `CUDA out of memory` não derruba o job: o estágio é refeito automaticamente em
+CPU, mais devagar. Se isso estiver acontecendo sempre, baixe o `DEMUCS_SEGMENT`.
+
+---
+
+## Desenvolvimento
+
+```bash
+# backend
+python -m venv .venv && source .venv/bin/activate
+pip install -e "backend[dev]"
+PIANOAPP_STATIC_DIR=frontend/dist uvicorn app.main:app --reload --port 8080 --app-dir backend
+
+# frontend (proxy para :8080 já configurado)
+cd frontend && npm install && npm run dev
+```
+
+Testes:
+
+```bash
+cd backend && python -m pytest          # tudo
+python -m pytest -m "not slow"          # só as unidades rápidas
+cd frontend && npm run typecheck
+```
+
+Os testes usam áudio sintético de alturas conhecidas (`scripts/make_test_audio.py`),
+então rodam sem GPU e sem baixar modelo nenhum.
+
+Para baixar os pesos fora do Docker: `python scripts/fetch_models.py`.
+
+---
+
+## API
+
+| Rota | O que faz |
+|---|---|
+| `POST /api/transcribe` | upload (`file`, `mode`, `force_route`) → `{job_id}` |
+| `GET /api/jobs` | histórico |
+| `GET /api/jobs/{id}` | estado, estágio, progresso, posição na fila |
+| `GET /api/jobs/{id}/result` | a transcrição |
+| `GET /api/jobs/{id}/audio` | o áudio original |
+| `GET /api/jobs/{id}/midi` | download `.mid` |
+| `POST /api/jobs/{id}/reprocess` | refaz com outra rota, sem reenviar o arquivo |
+| `DELETE /api/jobs/{id}` | remove job e arquivos |
+| `GET /api/health` | device, GPU, VRAM, modelos carregados |
+
+Documentação interativa em `/docs`.
+
+---
+
+## Créditos
+
+- [Demucs](https://github.com/adefossez/demucs) — separação de fontes (Meta).
+- [High-resolution Piano Transcription](https://github.com/bytedance/piano_transcription) — ByteDance.
+- [basic-pitch](https://github.com/spotify/basic-pitch) — Spotify.
+- [VexFlow](https://www.vexflow.com/) — renderização da partitura.

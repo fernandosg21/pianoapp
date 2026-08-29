@@ -6,6 +6,7 @@ serviço, sem CORS, sem proxy.
 from __future__ import annotations
 
 import logging
+import shutil
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -120,6 +121,33 @@ def job_result(job_id: str) -> Transcription:
             raise HTTPException(404, "Job não encontrado.")
         raise HTTPException(409, f"Transcrição ainda não concluída (estado: {status.state.value}).")
     return Transcription.model_validate(payload)
+
+
+@app.post("/api/jobs/{job_id}/reprocess")
+def reprocess(
+    job_id: str,
+    mode: Mode = Form(Mode.PRECISE),
+    force_route: Route | None = Form(None),
+) -> dict:
+    """Refaz a transcrição a partir do áudio já armazenado.
+
+    É o que dá saída ao usuário quando a triagem classifica errado: sem isso, um
+    caso de borda mal roteado exigiria enviar o arquivo de novo.
+    """
+    row = db.get(job_id)
+    if row is None or not row["audio_path"]:
+        raise HTTPException(404, "Job não encontrado.")
+    source = Path(row["audio_path"])
+    if not source.exists():
+        raise HTTPException(410, "O áudio original não está mais disponível.")
+
+    # Cópia própria: os dois jobs passam a ter ciclo de vida independente, e
+    # excluir o antigo não deixa o novo sem áudio.
+    copy = config.UPLOAD_DIR / f"{uuid.uuid4().hex[:12]}{source.suffix}"
+    shutil.copy2(source, copy)
+
+    new_id = jobs.submit(copy, row["filename"], mode, force_route)
+    return {"job_id": new_id}
 
 
 @app.get("/api/jobs/{job_id}/audio")

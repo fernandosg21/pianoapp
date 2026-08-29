@@ -1,0 +1,31 @@
+services:
+  pianoapp:
+    build: .
+    image: pianoapp:latest
+    container_name: pianoapp
+    restart: unless-stopped
+    ports:
+      - "${PIANOAPP_PORT:-8080}:8080"
+    volumes:
+      # Transcrições e áudios sobrevivem a `docker compose down`.
+      - pianoapp-data:/data
+    environment:
+      PIANOAPP_DEVICE: "${PIANOAPP_DEVICE:-auto}"
+      # Pico de VRAM do Demucs. 7 s cabe folgado nos 6 GB de uma GTX 1660;
+      # aumente se tiver mais VRAM, reduza se vir CUDA OOM no log.
+      PIANOAPP_DEMUCS_SEGMENT: "${PIANOAPP_DEMUCS_SEGMENT:-7.0}"
+      PIANOAPP_MAX_WORKERS: "${PIANOAPP_MAX_WORKERS:-1}"
+      PIANOAPP_MAX_UPLOAD_MB: "${PIANOAPP_MAX_UPLOAD_MB:-60}"
+      PIANOAPP_MAX_DURATION_S: "${PIANOAPP_MAX_DURATION_S:-600}"
+    # Passthrough da GPU. Exige o NVIDIA Container Toolkit no host; sem ele o
+    # app ainda sobe e roda em CPU (veja o README).
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  pianoapp-data:
