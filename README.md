@@ -12,17 +12,57 @@ lista de notas e partitura. Roda inteiro na sua máquina, com GPU.
 ```bash
 git clone https://github.com/fernandosg21/pianoapp.git
 cd pianoapp
-docker compose up -d --build
+./scripts/subir.sh
 ```
 
-Abra **http://localhost:8080**.
+É só isso. O script confere os pré-requisitos antes de gastar minutos em build (Docker,
+espaço em disco, alcance ao Zenodo de onde vem o checkpoint, passthrough de GPU),
+constrói, sobe, espera o app responder, roda o autoteste e imprime as duas URLs — a
+local e a da rede, para o iPad.
 
 O primeiro build baixa a imagem base do PyTorch e os pesos dos modelos (~5,5 GB no
-total) — leva alguns minutos. Depois disso o container funciona offline: nada é
-baixado em tempo de execução.
+total) e leva alguns minutos. Depois disso o container funciona offline: nada é baixado
+em tempo de execução.
 
-Para parar: `docker compose down`. As transcrições ficam guardadas num volume e
-reaparecem no próximo `up`.
+```bash
+./scripts/subir.sh --sem-teste   # só sobe, sem o autoteste
+./scripts/subir.sh --rebuild     # reconstrói a imagem do zero
+docker compose down              # parar
+```
+
+As transcrições ficam num volume e reaparecem no próximo `up`.
+
+No PowerShell puro (sem WSL), os mesmos passos à mão:
+
+```powershell
+docker compose up -d --build
+docker compose exec pianoapp python /app/scripts/autoteste.py
+```
+
+### Autoteste
+
+`scripts/autoteste.py` roda dentro do container e exercita os três modelos de verdade:
+o basic-pitch em ONNX, o checkpoint do modelo de piano da ByteDance e a separação do
+Demucs. Mede o **pico de VRAM de cada estágio** e diz se o `PIANOAPP_DEMUCS_SEGMENT`
+padrão serve para a sua placa — ou se dá para subir e ganhar velocidade.
+
+```bash
+docker compose exec pianoapp python /app/scripts/autoteste.py
+```
+
+Se algo falhar, ele imprime um relatório pronto para colar numa conversa com o Claude.
+
+## Se algo der errado
+
+| Sintoma | O que é | O que fazer |
+|---|---|---|
+| Build falha baixando o modelo de piano | Zenodo fora do ar ou bloqueado | Tente de novo mais tarde, ou `docker compose build --no-cache` |
+| `/api/health` diz `"gpu": false` | Passthrough de GPU inativo | Instale o NVIDIA Container Toolkit (seção acima). O app funciona em CPU enquanto isso |
+| `CUDA out of memory` no log | Pico de VRAM acima dos 6 GB | Baixe `PIANOAPP_DEMUCS_SEGMENT` no `.env` para `5.0`. O job não morre: refaz o estágio em CPU |
+| Transcrição muito lenta | Caiu para CPU | Confira a faixa de status no topo da interface |
+| `port is already allocated` | Porta 8080 ocupada | `PIANOAPP_PORT=8090` no `.env` |
+| `no space left on device` no build | Disco cheio | `docker system prune -a` |
+| iPad não abre a página | Firewall do host | `sudo ufw allow 8080/tcp` |
 
 ---
 
