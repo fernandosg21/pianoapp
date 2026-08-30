@@ -39,6 +39,21 @@ docker compose up -d --build
 docker compose exec pianoapp python /app/scripts/autoteste.py
 ```
 
+### Deixar o Claude fazer
+
+O repositório traz uma skill de deploy em `.claude/skills/deploy/`. Abrindo esta pasta
+no **Cowork** ou no **Claude Code**, basta pedir:
+
+> Faça o deploy do pianoapp nesta máquina.
+
+Ele roda o `subir.sh`, lê os relatórios em JSON, diagnostica o que falhar pela tabela da
+skill e ajusta o `PIANOAPP_DEMUCS_SEGMENT` conforme o pico de VRAM medido na sua placa —
+o default de 7,0 foi escolhido para 6 GB sem poder medir nada.
+
+Os dois scripts detectam quando a saída não é um terminal e desligam as cores, e ambos
+gravam relatório estruturado (`--json` no `subir.sh`, `PIANOAPP_AUTOTESTE_JSON` no
+autoteste), para o agente agir sobre dados em vez de raspar texto.
+
 ### Autoteste
 
 `scripts/autoteste.py` roda dentro do container e exercita os três modelos de verdade:

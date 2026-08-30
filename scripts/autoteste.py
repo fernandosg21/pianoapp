@@ -25,9 +25,18 @@ for _candidate in ("/app", str(_ROOT), str(_ROOT / "backend")):
     if _candidate not in sys.path and Path(_candidate).is_dir():
         sys.path.insert(0, _candidate)
 
-OK = "\033[32m✓\033[0m"
-FAIL = "\033[31m✗\033[0m"
-SKIP = "\033[33m–\033[0m"
+# Cor só quando há terminal: capturada por um agente, ANSI vira ruído.
+_TTY = sys.stdout.isatty()
+
+
+def _c(codigo: str, texto: str) -> str:
+    return f"\033[{codigo}m{texto}\033[0m" if _TTY else texto
+
+
+OK = _c("32", "✓")
+FAIL = _c("31", "✗")
+SKIP = _c("33", "–")
+RELATORIO_JSON = os.getenv("PIANOAPP_AUTOTESTE_JSON", "")
 API = os.getenv("PIANOAPP_SELFTEST_API", "http://127.0.0.1:8080")
 
 
@@ -61,7 +70,7 @@ class Report:
 
 
 def section(title: str) -> None:
-    print(f"\n\033[1m{title}\033[0m")
+    print("\n" + _c("1", title))
 
 
 # Falhas que este script levanta de propósito: a mensagem já diz tudo, e o traceback
@@ -134,7 +143,7 @@ def run(report: Report, name: str, fn, device=None) -> Result:
 
 
 def main() -> int:
-    print("\033[1mAutoteste do pianoapp\033[0m")
+    print(_c("1", "Autoteste do pianoapp"))
     print("Valida o que o ambiente de desenvolvimento não conseguia executar.\n")
 
     import numpy as np
@@ -158,7 +167,7 @@ def main() -> int:
         capability = torch.cuda.get_device_capability(device)
         print(f"  compute capability {capability[0]}.{capability[1]}")
     else:
-        print("  \033[33mSem CUDA — o autoteste roda em CPU.\033[0m")
+        print("  " + _c("33", "Sem CUDA — o autoteste roda em CPU."))
         print("  Se esta máquina tem GPU, o passthrough do Docker não está ativo:")
         print("  docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu22.04 nvidia-smi")
 
@@ -315,22 +324,38 @@ def main() -> int:
             folga = total - worst
             print(f"\n  Maior pico: {worst:.0f} MB de {total} MB ({folga:.0f} MB de folga)")
             if folga < 800:
-                print("  \033[33mFolga apertada. Baixe PIANOAPP_DEMUCS_SEGMENT no .env"
-                      " (tente 5.0).\033[0m")
+                print("  " + _c("33", "Folga apertada. Baixe PIANOAPP_DEMUCS_SEGMENT"
+                                   " no .env (tente 5.0)."))
             elif folga > 3000 and demucs_result.passed:
-                print("  \033[32mSobra VRAM. Suba PIANOAPP_DEMUCS_SEGMENT para 12 ou 15"
-                      " e ganhe velocidade.\033[0m")
+                print("  " + _c("32", "Sobra VRAM. Suba PIANOAPP_DEMUCS_SEGMENT para"
+                                   " 12 ou 15 e ganhe velocidade."))
+
+    if RELATORIO_JSON:
+        Path(RELATORIO_JSON).write_text(json.dumps({
+            "ok": not report.failed,
+            "device": str(device),
+            "gpu": info["gpu"],
+            "gpu_nome": info.get("gpu_name"),
+            "vram_total_mb": info.get("vram_total_mb"),
+            "verificacoes": [
+                {"nome": r.name, "passou": r.passed, "pulada": r.skipped,
+                 "detalhe": r.detail, "segundos": round(r.seconds, 2),
+                 "pico_vram_mb": round(r.vram_mb) if r.vram_mb is not None else None}
+                for r in report.results
+            ],
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"  relatório em {RELATORIO_JSON}")
 
     falhas = report.failed
     total_ok = sum(1 for r in report.results if r.passed and not r.skipped)
     print()
     if falhas:
-        print(f"\033[31m{len(falhas)} verificação(ões) falharam\033[0m, "
-              f"{total_ok} passaram.")
+        print(_c("31", f"{len(falhas)} verificação(ões) falharam")
+              + f", {total_ok} passaram.")
         print("\nCole o relatório acima na conversa com o Claude para diagnóstico.")
         return 1
 
-    print(f"\033[32mTudo passou\033[0m — {total_ok} verificações.")
+    print(_c("32", "Tudo passou") + f" — {total_ok} verificações.")
     print("\nO app está pronto. Abra http://localhost:8080")
     return 0
 

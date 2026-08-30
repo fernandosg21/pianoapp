@@ -13,25 +13,54 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-VERDE=$'\033[32m'; AMARELO=$'\033[33m'; VERMELHO=$'\033[31m'
-NEGRITO=$'\033[1m'; FIM=$'\033[0m'
+# Cor só quando a saída é um terminal: capturada por um agente ou por um arquivo
+# de log, ANSI vira ruído que atrapalha a leitura.
+if [ -t 1 ]; then
+  VERDE=$'\033[32m'; AMARELO=$'\033[33m'; VERMELHO=$'\033[31m'
+  NEGRITO=$'\033[1m'; FIM=$'\033[0m'
+else
+  VERDE=""; AMARELO=""; VERMELHO=""; NEGRITO=""; FIM=""
+fi
 
 ok()     { printf '  %s✓%s %s\n' "$VERDE" "$FIM" "$1"; }
 aviso()  { printf '  %s!%s %s\n' "$AMARELO" "$FIM" "$1"; }
 erro()   { printf '  %s✗%s %s\n' "$VERMELHO" "$FIM" "$1"; }
 titulo() { printf '\n%s%s%s\n' "$NEGRITO" "$1" "$FIM"; }
-morrer() { erro "$1"; [ $# -gt 1 ] && printf '\n    %s\n' "$2"; exit 1; }
+morrer() { erro "$1"; [ $# -gt 1 ] && printf '\n    %s\n' "$2"; escrever_json 1 "$1"; exit 1; }
+
+# Relatório legível por máquina, para um agente decidir o próximo passo sem
+# precisar interpretar texto formatado para humano.
+escrever_json() {
+  [ -z "${JSON:-}" ] && return 0
+  cat > "$JSON" <<JSONEOF
+{
+  "ok": $([ "${1:-0}" -eq 0 ] && echo true || echo false),
+  "erro": "${2:-}",
+  "gpu": "${EST_GPU:-nao}",
+  "gpu_nome": "${EST_GPU_NOME:-}",
+  "disco_livre_gb": "${EST_DISCO:-}",
+  "autoteste": "${EST_AUTOTESTE:-nao-executado}",
+  "url": "${EST_URL:-}",
+  "porta": "${PORTA:-}"
+}
+JSONEOF
+  printf '  relatório em %s\n' "$JSON"
+}
 
 RODAR_TESTE=1
 REBUILD=""
+JSON=""
 for arg in "$@"; do
   case "$arg" in
     --sem-teste) RODAR_TESTE=0 ;;
     --rebuild)   REBUILD="--no-cache" ;;
+    --json)      JSON="relatorio-deploy.json" ;;
     -h|--help)   sed -n '3,12p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)           morrer "opção desconhecida: $arg" ;;
   esac
 done
+
+EST_GPU="nao"; EST_GPU_NOME=""; EST_DISCO=""; EST_AUTOTESTE="nao-executado"; EST_URL=""
 
 DISCO_MINIMO_GB=15
 PORTA="${PIANOAPP_PORT:-8080}"
@@ -64,6 +93,7 @@ if [ "${DISCO_GB:-0}" -lt "$DISCO_MINIMO_GB" ]; then
          "Libere espaço, ou rode: docker system prune -a"
 fi
 ok "${DISCO_GB} GB livres em disco"
+EST_DISCO="$DISCO_GB"
 
 # O checkpoint do modelo de piano vem do Zenodo durante o build. É o passo com maior
 # chance de falhar, e falha depois de vários minutos de build — vale checar antes.
@@ -78,6 +108,7 @@ GPU_INFO=$(docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu22.04 \
   nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null | head -1 || true)
 if [ -n "${GPU_INFO:-}" ]; then
   ok "GPU visível ao Docker: ${GPU_INFO}"
+  EST_GPU="sim"; EST_GPU_NOME="$GPU_INFO"
 else
   aviso "o Docker não enxerga GPU — o app vai subir e rodar em CPU, bem mais devagar"
   printf '    Para habilitar, instale o NVIDIA Container Toolkit:\n'
@@ -127,9 +158,13 @@ fi
 if [ "$RODAR_TESTE" -eq 1 ]; then
   titulo "Autoteste"
   printf '  Exercita os três modelos e mede o pico de VRAM de cada estágio.\n\n'
-  if ! $COMPOSE exec -T pianoapp python /app/scripts/autoteste.py; then
+  if $COMPOSE exec -T pianoapp python /app/scripts/autoteste.py; then
+    EST_AUTOTESTE="passou"
+  else
+    EST_AUTOTESTE="falhou"
     printf '\n%sO app está de pé, mas o autoteste encontrou problemas.%s\n' "$AMARELO" "$FIM"
     printf 'Cole o relatório acima na conversa com o Claude.\n'
+    escrever_json 1
     exit 1
   fi
 fi
